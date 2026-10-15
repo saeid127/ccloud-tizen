@@ -1,70 +1,127 @@
-import { API_BASE, API_KEY, CLIENT_VERSION, LANGUAGE } from './config'
+// CCloud HTTP Client with automatic helper-server failover.
+// Replicates com.pira.ccloud.data.repository.BaseRepository from CCloud Android app.
 
-const TOKEN_KEY = '30nama.v2.token'
+import { API_BASE, HELPER_SERVERS } from './config'
+import { log } from '../lib/log'
 
-export type ApiErrorKind = 'challenge' | 'unauthorized' | 'rejected' | 'network'
+export type ApiErrorKind = 'network' | 'http' | 'parse' | 'empty'
 
 export class ApiError extends Error {
   readonly kind: ApiErrorKind
   readonly status?: number
-  constructor(kind: ApiErrorKind, message: string, status?: number) {
+  readonly url?: string
+
+  constructor(kind: ApiErrorKind, message: string, status?: number, url?: string) {
     super(message)
     this.kind = kind
     this.status = status
+    this.url = url
   }
 }
 
-type Envelope<T> = { status: number; success: boolean; error: boolean; msg: string | null; result: T }
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Generic executeRequest matching CCloud BaseRepository.executeRequest
+export async function executeRequest<T>(
+  primaryUrl: string,
+  opts: { retries?: number; timeoutMs?: number } = {},
+): Promise<T> {
+  const retries = opts.retries ?? 1
+  const timeoutMs = opts.timeoutMs ?? 25000
+
+  // 1. First, try primary server (with retries if network glitch)
+  let primaryException: Error | null = null
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const data = await fetchWithTimeout<T>(primaryUrl, timeoutMs)
+      log('ccloud_api', true, primaryUrl)
+      return data
+    } catch (err) {
+      primaryException = err instanceof Error ? err : new Error(String(err))
+      if (attempt < retries) {
+        await sleep(1000 * (attempt + 1))
+      }
+    }
+  }
+
+  log('ccloud_primary_failed', false, `${primaryUrl}: ${primaryException?.message}`)
+
+  // 2. If primary server fails, try helper servers (hostinnegar.com, windowsdiba.info)
+  for (let i = 0; i < HELPER_SERVERS.length; i++) {
+    const helperServer = HELPER_SERVERS[i]
+    try {
+      let helperUrl: string
+      if (primaryUrl.startsWith('/ccloud-api')) {
+        helperUrl = primaryUrl.replace('/ccloud-api', `/ccloud-helper-${i + 1}`)
+      } else {
+        helperUrl = primaryUrl.replace(/^https?:\/\/[^/]+/i, helperServer)
+      }
+      log('ccloud_fallback_try', true, helperUrl)
+      const data = await fetchWithTimeout<T>(helperUrl, timeoutMs)
+      log('ccloud_fallback_success', true, helperUrl)
+      return data
+    } catch (helperErr) {
+      log('ccloud_fallback_fail', false, `${helperServer}: ${helperErr instanceof Error ? helperErr.message : helperErr}`)
+      continue
+    }
+  }
+
+  // 3. If all servers fail, throw the original exception
+  throw (
+    primaryException ??
+    new ApiError('network', 'اتصال به سرورهای CCloud برقرار نشد', undefined, primaryUrl)
+  )
+}
+
+async function fetchWithTimeout<T>(url: string, timeoutMs: number): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+      },
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      throw new ApiError('http', `سرور با خطای ${res.status} پاسخ داد`, res.status, url)
+    }
+
+    const text = await res.text()
+    if (!text || !text.trim()) {
+      throw new ApiError('empty', 'پاسخ سرور خالی بود', res.status, url)
+    }
+
+    try {
+      return JSON.parse(text) as T
+    } catch (jsonErr) {
+      throw new ApiError('parse', `خطا در پردازش اطلاعات دریافتی: ${(jsonErr as Error).message}`, res.status, url)
+    }
+  } catch (err) {
+    if (err instanceof ApiError) throw err
+    if ((err as Error).name === 'AbortError') {
+      throw new ApiError('network', 'مهلت زمانی درخواست به پایان رسید (تایم‌اوت)', undefined, url)
+    }
+    throw new ApiError('network', (err as Error).message || 'خطای شبکه', undefined, url)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// Session helper for backwards compatibility and local state
+const TOKEN_KEY = 'ccloud.token'
 export const session = {
-  get: (): string | null => localStorage.getItem(TOKEN_KEY),
+  get: (): string | null => localStorage.getItem(TOKEN_KEY) ?? 'ccloud-session',
   set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
   clear: () => localStorage.removeItem(TOKEN_KEY),
 }
 
-type Form = Record<string, string | number | boolean | null | undefined>
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-export async function call<T>(action: string, form: Form = {}, opts: { retries?: number } = {}): Promise<Envelope<T>> {
-  const body = new URLSearchParams()
-  for (const [k, v] of Object.entries(form)) if (v !== undefined && v !== null) body.append(k, String(v))
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'c-api-key': API_KEY,
-    'c-version-number': CLIENT_VERSION,
-    'c-language': LANGUAGE,
-  }
-  const token = session.get()
-  if (token) headers['c-token'] = token
-
-  const retries = opts.retries ?? 2
-  let lastError: unknown
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(API_BASE + action, { method: 'POST', headers, body })
-      const text = await res.text()
-      // Fire-and-forget actions such as `observer` answer 204 with no body.
-      if (res.status === 204 || (res.ok && !text.trim()))
-        return { status: res.status, success: true, error: false, msg: null, result: null as T }
-      // Cloudflare answers blocked clients with an HTML challenge page instead of JSON.
-      if (text.trimStart().startsWith('<')) throw new ApiError('challenge', 'سرور سی‌نما درخواست را مسدود کرد', res.status)
-      const json = JSON.parse(text) as Envelope<T>
-      if (json.status === 401 || json.status === 403) throw new ApiError('unauthorized', json.msg || 'دسترسی ندارید', json.status)
-      return json
-    } catch (e) {
-      if (e instanceof ApiError) throw e
-      lastError = e
-      if (attempt < retries) await sleep(1500 * (attempt + 1))
-    }
-  }
-  throw new ApiError('network', lastError instanceof Error ? lastError.message : 'اتصال برقرار نشد')
-}
-
-// Most screens only want the result and treat success:false as an error.
-export async function result<T>(action: string, form: Form = {}): Promise<T> {
-  const env = await call<T>(action, form)
-  if (!env.success) throw new ApiError('rejected', env.msg || 'خطای ناشناخته', env.status)
-  return env.result
+export function buildEndpointUrl(path: string): string {
+  const base = API_BASE.replace(/\/+$/, '')
+  const cleanPath = path.replace(/^\/+/, '')
+  return `${base}/${cleanPath}`
 }

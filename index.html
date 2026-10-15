@@ -3,10 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0" />
-    <title>سی‌نما</title>
+    <title>سی‌کلاد TV</title>
+    <script>
+      // Global shims for older Samsung Tizen Chromium versions (Tizen 5.5 / Chromium 69)
+      if (typeof window !== 'undefined' && typeof window.globalThis === 'undefined') {
+        window.globalThis = window;
+      }
+    </script>
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="background-color: #0b0c0f; margin: 0; padding: 0;">
+    <div id="root">
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#888;font-size:32px;font-family:sans-serif;direction:rtl;">
+        در حال اجرای سی‌کلاد TV...
+      </div>
+    </div>
     <!-- Samsung product API (screensaver control); only resolves inside the TV runtime. -->
     <script src="$WEBAPIS/webapis/webapis.js"></script>
     <script type="module" src="./src/main.tsx"></script>

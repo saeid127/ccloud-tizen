@@ -18,15 +18,64 @@ export const is = (e: KeyboardEvent, k: keyof typeof Keys) => (Keys[k] as readon
 type TizenInput = { registerKey: (name: string) => void }
 type TizenApp = { getCurrentApplication: () => { exit: () => void } }
 type AppCommon = { setScreenSaver: (state: number) => void; AppCommonScreenSaverState: { SCREEN_SAVER_OFF: number; SCREEN_SAVER_ON: number } }
+export type AVPlayTrack = {
+  type: 'VIDEO' | 'AUDIO' | 'TEXT'
+  index: number
+  extra_info:
+    | string
+    | {
+        track_lang?: string
+        language?: string
+        fourCC?: string
+        sub_type?: string
+        track_num?: number
+      }
+}
+
+export type AVPlayListener = {
+  onbufferingstart?: () => void
+  onbufferingprogress?: (percent: number) => void
+  onbufferingcomplete?: () => void
+  oncurrentplaytime?: (timeMs: number) => void
+  onsubtitlechange?: (duration: number, text: string, data3?: unknown, data4?: unknown) => void
+  onstreamcompleted?: () => void
+  onerror?: (eventType: string) => void
+}
+
+export type WebapisAvplay = {
+  open: (url: string) => void
+  close: () => void
+  prepare: () => void
+  prepareAsync: (successCallback?: () => void, errorCallback?: (err: unknown) => void) => void
+  play: () => void
+  pause: () => void
+  stop: () => void
+  seekTo: (milliseconds: number, successCallback?: () => void, errorCallback?: (err: unknown) => void) => void
+  getState: () => 'NONE' | 'IDLE' | 'READY' | 'PLAYING' | 'PAUSED'
+  getCurrentTime: () => number
+  getDuration: () => number
+  setDisplayRect: (x: number, y: number, width: number, height: number) => void
+  setDisplayMethod: (
+    method: 'PLAYER_DISPLAY_MODE_LETTER_BOX' | 'PLAYER_DISPLAY_MODE_FULL_SCREEN' | 'PLAYER_DISPLAY_MODE_AUTO_ASPECT_RATIO',
+  ) => void
+  setListener: (listener: AVPlayListener) => void
+  getTotalTrackInfo: () => AVPlayTrack[]
+  setSelectTrack: (trackType: 'TEXT' | 'AUDIO', index: number) => void
+  setSilentSubtitle: (silent: boolean) => void
+  setSubtitlePosition?: (offsetMs: number) => void
+}
+
 declare global {
   interface Window {
     tizen?: { tvinputdevice?: TizenInput; application?: TizenApp }
     // Samsung product API, loaded by index.html from $WEBAPIS on the TV only.
-    webapis?: { appcommon?: AppCommon }
+    webapis?: { appcommon?: AppCommon; avplay?: WebapisAvplay }
   }
 }
 
 export const isTizen = () => typeof window.tizen !== 'undefined'
+export const isAvplaySupported = () =>
+  typeof window !== 'undefined' && typeof window.webapis?.avplay !== 'undefined'
 
 // Media and color keys are not delivered to web apps until they are registered.
 export function registerTvKeys() {

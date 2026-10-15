@@ -71,8 +71,12 @@ export function TitleScreen({ id, active }: { id: number; active: boolean }) {
               {!!t.info.time?.default && <span>{t.info.time.default} دقیقه</span>}
               {t.info.age && <span>{t.info.age}</span>}
               {!!t.score?.imdb?.score && <span className="imdb">IMDb {t.score.imdb.score}</span>}
-              {!!t.score?.['30nama']?.score && <span>سی‌نما {t.score['30nama'].score}</span>}
               {t.options.persian_subtitle && <span className="badge-inline">زیرنویس فارسی</span>}
+              {t.ccloudSources && t.ccloudSources.length > 0 && (
+                <span className="badge-inline">
+                  {t.ccloudSources.map((s) => s.quality).filter(Boolean).join(' · ')}
+                </span>
+              )}
             </div>
             {genres && <div className="genres">{genres}</div>}
             <p className="plot">{t.plot?.local || t.plot?.english}</p>

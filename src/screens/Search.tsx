@@ -8,8 +8,8 @@ import { SideMenu } from '../components/SideMenu'
 import { useStack } from '../nav/stack'
 
 const DEBOUNCE_MS = 450
-// The server answers shorter queries with "search cannot be empty".
-const MIN_CHARS = 3
+// Minimal characters to trigger search
+const MIN_CHARS = 2
 
 // Results refresh as the viewer types, which stands in for autocomplete.
 export function Search({ active }: { active: boolean }) {

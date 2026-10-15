@@ -1,187 +1,286 @@
-# 30nama TV
+# سی‌کلاد تی‌وی (CCloud TV برای تلویزیون‌های سامسونگ Tizen)
 
-An unofficial [30nama](https://30nama.com) app for Samsung TVs (Tizen). Browse, search and stream
-with Persian subtitles, all from the TV remote.
+<div align="center">
+  <img src="public/icon.png" width="160" height="160" alt="CCloud TV Logo" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);" />
+  <br />
+  <p><strong>کلاینت اختصاصی، سریع و بدون نیاز به ورود برای تماشای فیلم و سریال‌های سرویس CCloud روی تلویزیون‌های هوشمند سامسونگ (سیستم‌عامل Tizen)</strong></p>
+  <p>طراحی‌شده ویژه ریموت کنترل تلویزیون (10-foot UI)، دارای پلیر شتاب‌یافته سخت‌افزاری تایزن (AVPlay) و رندرینگ هوشمند زیرنویس‌های فارسی</p>
+</div>
 
-30nama has an official Android TV app but nothing for Samsung's Tizen TVs, so on a Samsung the
-choice was a phone cast or a laptop over HDMI. This app talks to the same API as the official TV
-client, so it shows the same catalogue and keeps your continue-watching in sync with your other
-devices. The interface is Persian and right-to-left.
+---
 
-![Search, browse, a genre and a title page on the TV](docs/screens.jpg)
+## 📑 فهرست مطالب
+- [معرفی پروژه](#-معرفی-پروژه)
+- [ویژگی‌های کلیدی](#-ویژگیهای-کلیدی)
+- [پیش‌نیازها](#-پیشنیازها)
+- [راهنمای جامع راه‌اندازی و نصب روی تلویزیون سامسونگ](#-راهنمای-جامع-راهاندازی-و-نصب-روی-تلویزیون-سامسونگ)
+- [توسعه و اجرای محلی (Local Development)](#-توسعه-و-اجرای-محلی-local-development)
+- [کلیدهای ریموت کنترل](#-کلیدهای-ریموت-کنترل)
+- [چالش‌های فنی و راه‌حل‌های کشف‌شده](#-چالشهای-فنی-و-راهحلهای-کشفشده)
+  - [۱. محدودیت‌های مرورگر Chromium 69 در تایزن ۵.۵](#۱-محدودیتهای-مرورگر-chromium-69-در-تایزن-۵۵)
+  - [۲. معماری پخش نیتیو و شتاب‌دهنده سخت‌افزاری AVPlay](#۲-معماری-پخش-نیتیو-و-شتابدهنده-سختافزاری-avplay)
+  - [۳. چالش عمیق زیرنویس‌های فارسی (SoftSub درون MKV)](#۳-چالش-عمیق-زیرنویسهای-فارسی-softsub-درون-mkv)
+  - [۴. اولویت‌بندی هوشمند کیفیت سورس‌ها (دوبله در برابر زیرنویس)](#۴-اولویتبندی-هوشمند-کیفیت-سورسها-دوبله-در-برابر-زیرنویس)
+  - [۵. ناوبری فضایی ریموت کنترل و طراحی آیکون تایل ۴K](#۵-ناوبری-فضایی-ریموت-کنترل-و-طراحی-آیکون-تایل-۴k)
+  - [۶. چالش‌های توسعه‌دهنده در تایزن (ریموت‌های بدون عدد و باگ زبان فارسی)](#۶-چالشهای-توسعهدهنده-در-تایزن-ریموتها-و-باگ-زبان-فارسی)
+- [ساختار فایل‌های پروژه](#-ساختار-فایلهای-پروژه)
+- [لایسنس و قدردانی](#-لایسنس-و-قدردانی)
 
-> **You need your own 30nama account with an active plan, and a Samsung TV in Developer Mode.**
-> Samsung only installs apps from its store, so this one is installed the developer way: with a
-> Samsung certificate made for your own TV. It takes about 20 minutes once. See [Install](#install).
+---
 
-## What it does
+## 🌟 معرفی پروژه
 
-| Area | |
+پروژه **CCloud TV** یک برنامه تحت وب بهینه‌سازی‌شده برای سیستم‌عامل تایزن (سامسونگ) است که به کاربران ایرانی امکان می‌دهد بدون نیاز به کامپیوتر یا کابل HDMI، مستقیماً از طریق ریموت کنترل تلویزیون هوشمند خود به آرشیو عظیم فیلم‌ها، سریال‌ها و انیمیشن‌های ارائه‌شده در شبکه **CCloud** دسترسی داشته باشند.
+
+این اپلیکیشن بر پایه‌ی معماری تلویزیونی پروژه `30nama-tv` بازنویسی شده و بدون نیاز به هیچ‌گونه لاگین یا پرداخت حق اشتراک، مستقیماً با سرورهای پایگاه داده CCloud تبادل داده می‌کند.
+
+---
+
+## ✨ ویژگی‌های کلیدی
+
+| بخش | قابلیت‌ها و توضیحات |
 |---|---|
-| Sign in | QR code: scan it with a phone that is logged in to 30nama and approve |
-| Home | Featured title, continue watching, suggested, movies, series, anime |
-| Search | On-screen Persian, English and digit keyboard; results update as you type |
-| Browse | Categories and genres, advanced filters (type, genre, IMDb score, decade, country), newest or most relevant |
-| Title page | Seasons and episodes, cast and director (each opens their other titles), watchlist and favourites |
-| My list | Watchlist, favourites, continue watching (with remove) |
-| Player | HLS up to 1080p, Persian or English subtitles in three sizes, stereo or 5.1, skip intro, a next-episode countdown at the credits, resume where you left off on any device |
+| 🔓 **بدون نیاز به حساب کاربری** | باز شدن آنی برنامه بدون نیاز به شماره موبایل، ثبت‌نام یا اسکن کیوآرکد |
+| 🎬 **موتور پخش نیتیو سامسونگ** | استفاده از رابط سخت‌افزاری `webapis.avplay` تایزن جهت پخش روان MKV، MP4 و HLS |
+| 📝 **مدیریت پیشرفته زیرنویس** | استخراج خودکار تِرَک‌های سافت‌ساب تعبیه‌شده در ویدیو با فونت **وزیرمتن** و کادر شیشه‌ای خوانا |
+| 🧭 **ناوبری روان ریموت کنترل** | پشتیبانی از D-Pad ریموت بر پایه کتابخانه Norigin Spatial Navigation |
+| 🔍 **جستجوی دوزبانه زنده** | کیبورد تعاملی روی صفحه تلویزیون با پشتیبانی کامل از حروف فارسی و انگلیسی |
+| 🗂️ **دسته‌بندی و فیلترهای دقیق** | تفکیک بر اساس ژانر، کشور سازنده، مرتب‌سازی بر اساس امتیاز IMDb، سال انتشار و جدیدترین‌ها |
+| ⏱️ **ادامه تماشا و لیست شخصی** | ذخیره خودکار ثانیه توقف ویدیو در حافظه داخلی تلویزیون و بخش نشان‌شده‌ها |
+| 🛠️ **پنل عیب‌یابی درلحظه** | نمایش وضعیت شبکه، تِرَک‌های ویدیویی و خطاها روی صفحه با فشردن دکمه قرمز کنترل |
 
-Only titles that stream are listed. Downloads, payments, ratings and comments are not in the app,
-because the API the official TV client uses has no way to do them.
+---
 
-## Requirements
+## 📋 پیش‌نیازها
 
-**1. A Samsung TV on Tizen 6.5 or later**, which is roughly the 2022 models onward. Tested on a 2025
-model running Tizen 9.0.
+1. **تلویزیون سامسونگ:** سیستم‌عامل **Tizen 5.5 یا بالاتر** (مدل‌های ۲۰۲۰ به بعد نظیر سری TU, AU, BU, CU, DU و تمامی تلویزیون‌های QLED و OLED).
+2. **اتصال شبکه:** کامپیوتر و تلویزیون باید به یک شبکه وای‌فای یا مودم یکسان متصل باشند.
+3. **محیط توسعه Tizen Studio:**
+   - نصب ابزارهای خط فرمان Tizen CLI و SDB (مسیر پیش‌فرض ویندوز: `C:\tizen-studio\tools`).
+   - نصب افزونه‌های تلویزیون از طریق پکیج منیجر تایزن:
+     ```bash
+     package-manager-cli.bin install cert-add-on Certificate-Manager TV-SAMSUNG-Public-WebAppDevelopment --accept-license
+     ```
+4. **محیط توسعه نود:** `Node.js 20+` به همراه `npm`.
 
-**2. Tizen Studio CLI** with the Samsung certificate extension and the TV extensions. The
-[CLI installer](https://developer.tizen.org/development/tizen-studio/download) is enough; the IDE
-is not needed. After installing:
+---
 
-```bash
-~/tizen-studio/package-manager/package-manager-cli.bin install \
-  cert-add-on Certificate-Manager TV-SAMSUNG-Public-WebAppDevelopment --accept-license
+## 🚀 راهنمای جامع راه‌اندازی و نصب روی تلویزیون سامسونگ
+
+### ۱. فعال‌سازی حالت توسعه‌دهنده (Developer Mode) در تلویزیون
+1. دکمه **Home** یا **Smart Hub** را روی کنترل فشار داده و وارد بخش **Apps** شوید.
+2. روی صفحه Apps، کلیدهای عددی `1` سپس `2` سپس `3` سپس `4` و `5` را پشت سر هم فشار دهید.
+   > [!TIP]
+   > **اگر کنترل تلویزیون شما دکمه‌های عددی ندارد (ریموت هوشمند OneRemote):**
+   > اپلیکیشن رسمی **SmartThings** سامسونگ را روی گوشی موبایل خود نصب کرده و به تلویزیون متصل شوید. سپس در بخش ریموت کنترل مجازی گوشی، پد عددی را باز کرده و اعداد `1 2 3 4 5` را به ترتیب وارد کنید تا پنجره فعال‌سازی باز شود.
+3. یک پنجره پاپ‌آپ با عنوان **Developer Mode Configuration** ظاهر می‌شود:
+   - گزینه **Developer Mode** را روی **On** بگذارید.
+   - در فیلد **Host PC IP**، آدرس آی‌پی کامپیوتر خود را در شبکه خانگی (مثلاً `192.168.1.100`) وارد کنید.
+   > [!IMPORTANT]
+   > **نکته بسیار مهم در صورت فارسی بودن زبان تلویزیون (حل مشکل وصل نشدن SDB):**
+   > اگر زبان منوی تلویزیون شما روی **فارسی** تنظیم شده باشد، سیستم‌عامل تایزن به دلیل چیدمان راست‌به‌چپ (RTL)، بخش‌های آی‌پی را معکوس پردازش می‌کند و در نتیجه ابزار SDB موفق به اتصال به تلویزیون نمی‌شود. اگر با خطای وصل نشدن SDB مواجه شدید، آی‌پی کامپیوتر خود را در فیلد تلویزیون به صورت **برعکس** وارد کنید (به عنوان مثال اگر آی‌پی کامپیوتر شما `192.168.1.100` است، آن را به شکل `100.1.168.192` تایپ کنید) یا موقتاً زبان تلویزیون را انگلیسی کنید.
+4. تلویزیون را با نگه داشتن دکمه پاور روی ریموت کنترل ری‌استارت کنید تا حالت توسعه‌دهنده فعال شود.
+
+### ۲. اتصال ابزار SDB به تلویزیون
+آی‌پی تلویزیون خود را از تنظیمات شبکه تلویزیون پیدا کنید (مثلاً `192.168.100.15`). سپس در ترمینال دستورات زیر را وارد کنید:
+```powershell
+sdb connect 192.168.100.15:26101
+sdb devices
+```
+باید خروجی مشابه زیر دریافت کنید:
+```text
+List of devices attached 
+192.168.100.15:26101    device        UA55TU8500UXTW
 ```
 
-**3. A Samsung account**, to create the certificate. Any account works; it does not need to be the
-one on the TV.
+### ۳. ساخت پروفایل و گواهی امنیتی سامسونگ (Samsung Certificate)
+تلویزیون‌های سامسونگ بسته‌های نرم‌افزاری غیررسمی را بدون امضا نمی‌پذیرند:
+1. نرم‌افزار **Certificate Manager** تایزن را باز کنید.
+2. گزینه **Samsung Certificate** را انتخاب کرده و با اکانت سامسونگ وارد شوید.
+3. نوع گواهی را **TV** انتخاب کنید.
+4. در مرحله DUID، با اتصال به تلویزیون، شناسه منحصربه‌فرد DUID تلویزیون شما به طور خودکار اضافه می‌شود.
+5. پروفایل گواهی را با نام `CCLOUD` ذخیره کنید.
 
-**4. The client key.** Requests carry a `c-api-key` header, the same one the official 30nama TV web
-client (`tv.30app.store`) sends. It is not included in this repo. You can read it from that client's
-network requests in your browser's developer tools.
+### ۴. نصب و اجرای خودکار با یک دستور (One-Click Deploy)
+اسکریپت اتوماسیون کامل برای ویندوز در [scripts/tv.ps1](file:///c:/projects/ccloud-tizen/scripts/tv.ps1) و برای مک/لینوکس در [scripts/tv.sh](file:///c:/projects/ccloud-tizen/scripts/tv.sh) آماده شده است:
 
-**5. Node 20 or later**, only if you build from source.
-
-## Install
-
-**1. Turn on Developer Mode on the TV.** Open Apps, press `1 2 3 4 5` on the remote, switch
-Developer Mode on, enter your computer's IP address, then restart the TV.
-
-**2. Connect to it.**
-
-```bash
-~/tizen-studio/tools/sdb connect <tv-ip>
-~/tizen-studio/tools/sdb -s <tv-ip>:26101 shell 0 getduid    # note this; the certificate needs it
+```powershell
+# در ویندوز (PowerShell)
+.\scripts\tv.ps1 -TvIp 192.168.100.15 -Profile CCLOUD
 ```
 
-**3. Create a Samsung certificate profile** named `30nama`. Open
-`~/tizen-studio/tools/certificate-manager/Certificate-manager.app`, add a profile, choose
-**Samsung** then **TV**, create a new author certificate (sign in with your Samsung account when
-the browser opens), then a new distributor certificate with privilege **Public**. With the TV
-connected, its DUID is already in the list; if not, add the one from step 2.
+این اسکریپت مراحل زیر را خودکار انجام می‌دهد:
+- بیلد بیلد پروداکشن بهینه‌شده با Vite و پلاگین Legacy.
+- بسته‌بندی فایل‌های خروجی در قالب پکیج `ccloud-tv.wgt`.
+- امضای پکیج با کلیدهای پروفایل `CCLOUD`.
+- انتقال به تلویزیون از طریق SDB و اجرای خودکار برنامه روی صفحه تلویزیون.
 
-**4a. From a release** (no Node needed). Download `30nama-tv-<version>.zip` from
-[Releases](https://github.com/aliir74/30nama-tv/releases), unzip it, and put the client key into
-`config.json` inside the folder:
+---
 
-```json
-{ "apiKey": "<the c-api-key value>" }
-```
+## 💻 توسعه و اجرای محلی (Local Development)
 
-Then sign and install:
+برای توسعه رابط کاربری و تست صفحات روی کامپیوتر:
 
 ```bash
-cd 30nama-tv
-~/tizen-studio/tools/ide/bin/tizen package -t wgt -s 30nama -- .
-mv ./*.wgt 30nama-tv.wgt    # the installer rejects the Persian file name it is given
-~/tizen-studio/tools/ide/bin/tizen install -n 30nama-tv.wgt -s <tv-ip>:26101
-```
-
-**4b. From source.**
-
-```bash
-git clone https://github.com/aliir74/30nama-tv && cd 30nama-tv
+# نصب وابستگی‌ها
 npm install
-echo 'VITE_API_KEY=<the c-api-key value>' > .env.local    # git-ignored
-scripts/tv.sh <tv-ip>       # builds, signs with the "30nama" profile, installs, launches
+
+# اجرای سرور توسعه
+npm run dev
+```
+سپس آدرس `http://127.0.0.1:5173` را در مرورگر باز کنید.
+
+> **نکته درباره پروکسی CORS:** در مرورگر دسکتاپ، درخواست‌های مستقیم API به دلیل محدودیت‌های CORS مسدود می‌شوند. در محیط توسعه محلی (`npm run dev`)، درخواست‌ها از طریق پروکسی داخلی Vite (`/ccloud-api`) هدایت می‌شوند. اما در نسخه بیلد نهایی تلویزیون (`.wgt`)، از آنجا که برنامه در بستر فایل‌های محلی اجرا می‌شود، ارتباط مستقیم با سرورهای اصلی برقرار می‌گردد.
+
+---
+
+## 🎮 کلیدهای ریموت کنترل
+
+| کلید ریموت | عملکرد در منوها و صفحات | عملکرد در حین پخش ویدیو |
+|---|---|---|
+| **جهت‌نماها (Arrows)** | جابجایی فوکوس بین پوسترها و دکمه‌ها | **چپ / راست:** عقب و جلو بردن زمان فیلم<br>**بالا / پایین:** نمایش نوار ابزار پخش (OSD) |
+| **Enter / OK** | انتخاب و باز کردن فیلم، فصل یا دکمه | توقف / ادامه پخش (Play/Pause) |
+| **بازگشت (Back)** | برگشت به صفحه قبل (در صفحه اصلی: بستن برنامه) | بستن منوی کیفیت/زیرنویس؛ بازگشت به صفحه جزئیات |
+| **Play / Pause** | — | توقف یا ازسرگیری پخش |
+| **FastForward / Rewind** | — | پرش ۳۰ ثانیه‌ای سریع به جلو یا عقب |
+| **Next / Prev Track** | — | رفتن به قسمت بعدی / شروع مجدد قسمت فعلی |
+| **دکمه قرمز (Red Key)** | نمایش پنجره دیباگ و وضعیت اتصال | نمایش پنجره عیب‌یابی و تِرَک‌های ویدیو |
+
+---
+
+## 🔬 چالش‌های فنی و راه‌حل‌های کشف‌شده
+
+در طول پیاده‌سازی و استقرار پروژه روی تلویزیون سامسونگ مدل `UA55TU8500UXTW` (تایزن ۵.۵)، با چالش‌های فنی عمیقی روبرو شدیم که حل آن‌ها نقشه راه ارزشمندی برای هر توسعه‌دهنده تایزن است:
+
+```mermaid
+flowchart TD
+    A["چالش‌های فنی تایزن"] --> B["محدودیت Chromium 69"]
+    A --> C["پلیر نیتیو AVPlay"]
+    A --> D["زیرنویس‌های کانتینر MKV"]
+    
+    B --> B1["عدم پشتیبانی از Optional Chaining و fetch در file://"]
+    B1 --> B2["حل با @vitejs/plugin-legacy و پیاده‌سازی XHR"]
+    
+    C --> C1["تگ &lt;video&gt; وب در پخش MKV کرش می‌کند"]
+    C1 --> C2["حل با webapis.avplay سخت‌افزاری و ترنسپرنسی لایه‌ها"]
+    
+    D --> D1["باگ setSilentSubtitle(true) که زیرنویس را مسدود می‌کرد"]
+    D --> D2["کدهای زبان نامتعارف مانند pe.. در انکودهای ایرانی"]
+    D --> D3["خطای INVALID_STATE متد setSelectTrack در وضعیت READY"]
+    D1 & D2 & D3 --> D4["حل با setSilentSubtitle(false)، تطبیق هوشمند pe* و فراخوانی در PLAYING"]
 ```
 
-The app then sits in the TV's app list as **سی‌نما TV**. Open it, scan the QR code with your
-phone, approve, and you are in.
+---
 
-## Using it
+### ۱. محدودیت‌های مرورگر Chromium 69 در تایزن ۵.۵
+تلویزیون‌های تولید سال ۲۰۲۰ سامسونگ (از جمله پردازنده‌های Crystal UHD) از نگارش **Chromium 69** به عنوان وب‌ویو داخلی استفاده می‌کنند. این نسخه قدیمی است و بسیاری از ویژگی‌های مدرن جاوااسکریپت را ندارد:
+* **سینتکس‌های مدرن:** عملگرهایی نظیر Optional Chaining (`?.`) و Nullish Coalescing (`??`) خطای `SyntaxError: Unexpected token .` در سطح موتور جاوااسکریپت ایجاد می‌کنند.
+  - **راهکار:** در `vite.config.ts` افزونه `@vitejs/plugin-legacy` با تارگت‌های قدیمی تنظیم شد تا تمامی فایل‌های خروجی به سینتکس استاندارد سازگار با کرومیوم ۶۹ تبدیل (Transpile) شوند و شیم `window.globalThis` در `index.html` تزریق گردید.
+* **محدودیت پروتکل `file://`:** در تایزن، برنامه از مسیر محلی `file:///` بارگذاری می‌شود. مرورگر کرومیوم متد مدرن `fetch()` را روی پروتکل `file://` مسدود می‌کند.
+  - **راهکار:** تمام ارتباطات شبکه با سرورها در [src/api/client.ts](file:///c:/projects/ccloud-tizen/src/api/client.ts) بر پایه `XMLHttpRequest` استاندارد پیاده‌سازی شدند.
 
-| Key | Browsing | Player, controls hidden | Player, controls shown |
-|---|---|---|---|
-| Arrows | Move | Left/Right seek 10 s; hold to speed up (30 s, then 60 s); Up/Down show controls | Move; on the seek bar, Left/Right seek |
-| OK | Open | Pause and show controls | On the seek bar: play or pause |
-| Back | Back; on home, exit | Leave the player | Close a panel, then hide the controls |
-| ▶❚❚ ⏪ ⏩ | | Play/pause, seek 30 s | Same |
-| ⏮ ⏭ | | Previous (restarts the episode first) / next episode | Same |
-| Red | Debug log | Debug log | Debug log |
+---
 
-The side menu is on the right edge: press Right from the rightmost item on any main screen.
-Settings (default subtitle language and size, stereo or 5.1, starting quality) and sign-out are
-under **حساب و تنظیمات**.
+### ۲. معماری پخش نیتیو و شتاب‌دهنده سخت‌افزاری AVPlay
+تگ استاندارد وب `<video>` به دلیل کمبود حافظه وب‌ویو توانایی بازگشایی (Demuxing) و دیکود روان فایل‌های با حجم بالا و کدک‌های سنگین کانتینر MKV را ندارد:
+* **استفاده از API سخت‌افزاری:** در [src/player/engine.ts](file:///c:/projects/ccloud-tizen/src/player/engine.ts) از آبجکت نیتیو `<object type="application/avplayer">` و API سامسونگ `webapis.avplay` استفاده شد.
+* **ترنسپرنسی لایه‌ها (Layer Transparency):** در معماری تایزن، خروجی کارت تصویر ویدیو روی سطحی سخت‌افزاری **پشت** پنجره وب رندر می‌شود. اگر پس‌زمینه صفحات وب شفاف نباشد، ویدیو دیده نمی‌شود. با افزودن کلاس `body.avplay-active` و قوانین CSS:
+  ```css
+  body.avplay-active,
+  body.avplay-active #root,
+  body.avplay-active .screen,
+  body.avplay-active .player {
+    background: transparent !important;
+  }
+  ```
+  تمامی سطوح روی ویدیو ترنسپرنت شده و تنها کنترل‌ها و زیرنویس با لایه‌بندی (`z-index: 20`) روی ویدیو نمایش می‌یابند.
 
-## Limits
+---
 
-**Installed the developer way, so it is tied to your TV.** The certificate carries your TV's DUID.
-Another TV needs a distributor certificate that includes its DUID too, and a re-sign.
+### ۳. چالش عمیق زیرنویس‌های فارسی (SoftSub درون MKV)
 
-**The client key can change.** If 30nama rotates it, every request fails until you put the new value
-in `config.json` (or `.env.local`) and reinstall.
+سرویس CCloud فایل مستقل زیرنویس (`.srt` یا `.vtt`) از طریق API ارائه نمی‌دهد؛ بلکه زیرنویس‌ها به صورت تِرَک متنی داخلی (`S_TEXT/UTF8`) درون فایل‌های MKV قرار دارند. این بخش پیچیده‌ترین چالش پروژه بود که با اتصال مستقیم دیباگر به پردازنده تلویزیون به صورت تجربی حل شد:
 
-**Cloudflare sits in front of the API.** The TV runtime passes today. If 30nama tightens it, the
-login screen shows «سرور سی‌نما درخواست را مسدود کرد» and nothing loads; there is no workaround in
-the app.
+1. **باگ متد `setSilentSubtitle`:**
+   - متد `avplay.setSilentSubtitle(true)` به سخت‌افزار تلویزیون دستور می‌دهد که دریافت و پردازش زیرنویس را کاملاً سایلنت کند. در نتیجه حتی ایونت `onsubtitlechange` نیز صفر رویداد ارسال می‌کرد!
+   - **راهکار:** متد باید صریحاً روی `setSilentSubtitle(false)` تنظیم شود تا دیکودر استریم زیرنویس را فعال نگه دارد و متن‌ها از طریق `onsubtitlechange` به دست برنامه برسند.
 
-**No downloads, ratings, comments, collections or box office.** The v2 API the official TV client
-uses has no actions for them. `TASKS.md` lists every action it does have.
+2. **خطای وضعیت (`PLAYER_ERROR_INVALID_STATE`):**
+   - فراخوانی `avplay.setSelectTrack('TEXT', index)` در وضعیت `READY` (داخل کال‌بک `prepareAsync`) در فریم‌ور تایزن ۵.۵ منجر به خطای وضعیت نامعتبر می‌شد.
+   - **راهکار:** پیاده‌سازی مکانیزم انتخاب مؤجل (Deferred Selection)؛ تِرَک زیرنویس ذخیره شده و دقیقاً پس از تغییر وضعیت به `PLAYING` یا `PAUSED` اعمال می‌شود.
 
-**Removing a title from continue watching can take a few minutes to show** after you have just
-watched it. The server caches the list.
+3. **کدهای زبان نامتعارف در انکودهای ایرانی (`"pe  "`):**
+   - در تست زنده استخراج متادیتا (`getTotalTrackInfo()`) روی تلویزیون، مشخص شد ریلیزهای فارسی (مانند Film2Media و ZarFilm) زبان زیرنویس را به شکل `"pe  "` (با دو فاصله) در کانتینر ذخیره کرده‌اند!
+   - ریجکس‌های متداول نظیر `fa|per|farsi` این متادیتا را رد می‌کردند. با پیاده‌سازی تابع اختصاصی `isPersian`:
+     ```typescript
+     function isPersian(lang: string, name: string): boolean {
+       const l = (lang || '').trim().toLowerCase()
+       const n = (name || '').trim().toLowerCase()
+       return l.startsWith('fa') || l.startsWith('pe') || /فارسی|farsi|persian/i.test(n)
+     }
+     ```
+     تمامی کدهای زبان فارسی با هرگونه فاصله یا پسوند با دقت ۱۰۰٪ شناسایی شدند.
 
-## Troubleshooting
+4. **زمان‌بندی و رندرینگ شیشه‌ای زیرنویس در لایه React:**
+   - متن تمیزشده از کاراکترهای اضافی کانتینر (`\r` و برچسب‌های استایل) به کامپوننت React فرستاده شده و با فونت زیبای وزیرمتن نمایش می‌یابد.
+   - همچنین با استفاده از مقدار `duration` ارسال‌شده از AVPlay، یک تایمر خودکار انقضا تنظیم شد تا زیرنویس‌ها پس از پایان دیالوگ بدون معطلی محو شوند.
 
-**`install failed` or a certificate error during install.** The distributor certificate does not
-include this TV's DUID. Check it with `sdb shell 0 getduid` and recreate the distributor
-certificate with it.
+---
 
-**`There is no connected target`.** The `sdb` connection drops now and then. Run
-`sdb connect <tv-ip>` again. If it refuses, the IP in the TV's Developer Mode settings must be the
-computer's current address.
+### ۴. اولویت‌بندی هوشمند کیفیت سورس‌ها (دوبله در برابر زیرنویس)
+بسیاری از عناوین CCloud برای یک رزولوشن خاص (مثلاً 720p) دو سورس ارائه می‌دهند: یک نسخه با دوبله فارسی و یک نسخه با زبان اصلی و زیرنویس.
+* الگوریتم `pickInitialIndex` در [engine.ts](file:///c:/projects/ccloud-tizen/src/player/engine.ts) ارتقا یافت تا در صورت روشن بودن زیرنویس در تنظیمات، سورس‌های دارای برچسب `زیرنویس` یا `sub` را بر سورس‌های دوبله اولویت دهد.
 
-**The login screen shows an error instead of a QR code.** Press Red to open the debug log; the
-failing line names the step and the server's answer. «سرور سی‌نما درخواست را مسدود کرد» means
-Cloudflare blocked the request. Any other refusal on the very first call usually means the client
-key is missing or out of date.
+---
 
-**Playback starts blurry.** It should open at 1080p within a couple of seconds. On a slow network,
-pick a fixed quality under **حساب و تنظیمات** → **کیفیت تصویر**.
+### ۵. ناوبری فضایی ریموت کنترل و طراحی آیکون تایل ۴K
+* **Norigin Spatial Navigation:** تلویزیون فاقد ماوس است. تمام دکمه‌ها و پوسترهای برنامه به صورت شبکه‌ای با ریموت کنترل قابل پیمایش هستند و بازگشت از هر صفحه، فوکوس را در موقعیت قبلی حفظ می‌کند.
+* **آیکون مربعی ۵۱۲x512:** لانچر سیستم‌عامل تایزن با آیکون‌های دارای گوشه شفاف یا سایه‌های غیر استاندارد دچار کشیدگی یا پس‌زمینه سیاه ناهماهنگ می‌شود. برای لانچر تایل سامسونگ، یک آیکون Full-Bleed با ابعاد دقیق ۵۱۲×۵۱۲ پیکسل با تم مشکی ابسیدین و ابر طلایی نئونی متناسب با تم برنامه طراحی و جایگزین شد.
 
-## How it works
+---
 
-A Vite, React and TypeScript web app, built for Chromium 85 (the browser in Tizen 6.5) and loaded
-from `file://` inside the `.wgt` package.
+### ۶. چالش‌های توسعه‌دهنده در تایزن (ریموت‌های بدون عدد و باگ زبان فارسی)
+* **کنترل‌های هوشمند فاقد کلید عددی (OneRemote):** تلویزیون‌های مدرن سامسونگ تنها دکمه‌های جهتی، برگشت و خانه دارند. برای فشردن پیاپی اعداد `1 2 3 4 5` و ظاهر شدن کادر توسعه‌دهنده، اتصال موبایل از طریق اپلیکیشن **SmartThings** و استفاده از ریموت کنترل مجازی روی گوشی الزامی است.
+* **باگ راست‌به‌چپ (RTL) فیلد Host IP در تایزن:** زمانی که زبان تلویزیون روی **فارسی** قرار دارد، سیستم‌عامل تایزن ورودی فیلد آی‌پی را از راست به چپ پردازش می‌کند؛ بنابراین در صورت وارد کردن آی‌پی به صورت عادی، بخش‌ها معکوس ذخیره شده و ارتباط دیمن `sdb` متصل نمی‌شود. وارد کردن آی‌پی به صورت معکوس (مثلاً `100.1.168.192` به جای `192.168.1.100`) یا تغییر موقت زبان تلویزیون به انگلیسی این باگ عجیب تایزن را برطرف می‌کند.
 
-- **Navigation:** [norigin spatial navigation](https://github.com/NoriginMedia/Norigin-Spatial-Navigation)
-  maps the remote's arrows onto what is on screen. Each screen is a focus boundary, and screens
-  under the current one stay mounted, so Back returns you to the same item.
-- **API:** the v2 actions the official TV client uses, as form-encoded POSTs with its headers.
-  `src/api/endpoints.ts` is the whole surface.
-- **Playback:** [hls.js](https://github.com/video-dev/hls.js) over Media Source Extensions, so the
-  app picks the quality and the stereo or 5.1 audio track. Subtitles are SRT or VTT, parsed in the
-  app and drawn over the video. Progress goes back to 30nama every 30 seconds, so continue watching
-  matches your other devices.
-- **Smoothness on TV hardware:** no CSS transitions, and every scrolling area is a real scroller,
-  so Chromium moves it on the GPU. Animated focus effects were costing 100 to 250 ms per frame on a
-  2025 TV.
+---
 
-`TASKS.md` records the API behaviour the app depends on, with the quirks found along the way: for
-example, `streamonly` must be the string `"true"`, and people pages only match exactly by IMDb ID.
+## 📁 ساختار فایل‌های پروژه
 
-## Development
-
-```bash
-npm run dev      # http://localhost:5173, 1920x1080
+```text
+ccloud-tizen/
+├── public/
+│   ├── config.xml             # مانیفست تایزن (مجوزها، امتیاز دسترسی، نام و آیکون)
+│   ├── icon.png               # آیکون ۵۱۲×۵۱۲ مربعی لانچر تلویزیون
+│   └── fonts/                 # فونت وزیرمتن (Vazirmatn) با وزن‌های مختلف
+├── scripts/
+│   ├── tv.ps1                 # اسکریپت اتوماسیون بیلد، پکیج و نصب در ویندوز
+│   ├── tv.sh                  # اسکریپت اتوماسیون در مک و لینوکس
+│   └── release.sh             # اسکریپت تولید پکیج ریلیز نهایی
+├── src/
+│   ├── api/                   # ماژول ارتباط با سرورهای CCloud و تبدیل مدل‌ها
+│   │   ├── client.ts          # ارسال ریکوئست‌های XHR مقاوم در برابر فیلترینگ
+│   │   ├── config.ts          # آدرس‌های سرور اصلی و سرورهای کمکی (Failover)
+│   │   ├── endpoints.ts       # اندپوینت‌های فیلم، سریال، جستجو و فصل‌ها
+│   │   └── types.ts           # مدل‌های داده و توابع پارس متادیتا
+│   ├── components/            # کامپوننت‌های رابط کاربری (دکمه، منو، کیبورد مجازی)
+│   ├── lib/                   # کتابخانه‌های کمکی
+│   │   ├── tv.ts              # تعریف تایپ‌های Webapis تایزن و کلیدهای کنترل
+│   │   ├── settings.ts        # ذخیره‌سازی محلی تنظیمات کیفیت و زیرنویس
+│   │   └── log.ts             # سیستم ثبت لاگ عیب‌یابی درلحظه
+│   ├── player/                # هسته پخش ویدیو و زیرنویس
+│   │   ├── engine.ts          # پیاده‌سازی پخش سخت‌افزاری AVPlay و فال‌بک HLS/HTML5
+│   │   ├── Player.tsx         # کنترل‌های پلیر، OSD، جدول زمان‌بندی و نمایش زیرنویس
+│   │   └── subtitles.ts       # توابع پارس و استخراج Cues زیرنویس
+│   └── screens/               # صفحات برنامه (خانه، جزئیات عنوان، جستجو، پروفایل)
+├── vite.config.ts             # تنظیمات بیلد و پلاگین Legacy برای کرومیوم ۶۹
+└── package.json
 ```
 
-In a desktop browser the arrows, Enter and Backspace (or Escape for Back) drive it like a remote,
-and `r` opens the debug log. On the TV, `scripts/tv.sh` launches the app with the web inspector on;
-the last line of its output names the port, and `http://<tv-ip>:<port>` opens Chrome DevTools for it.
+---
 
-## Disclaimer
+## ⚖️ لایسنس و قدردانی
 
-Not affiliated with 30nama. It uses your own account and plan, and shows only what the official
-apps show you.
+* این پروژه تحت مجوز **MIT License** منتشر شده است.
+* با قدردانی ویژه از پروژه پیشگام [30nama-tv](https://github.com/aliir74/30nama-tv) بابت معماری تایزن و ناوبری تلویزیونی.
+* با قدردانی از توسعه‌دهندگان اپلیکیشن [CCloud](https://github.com/code3-dev/CCloud) برای مدل‌های محتوا و سرورهای توزیع رسانه.

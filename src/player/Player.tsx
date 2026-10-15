@@ -11,7 +11,7 @@ import { settings, useSettings } from '../lib/settings'
 import { is, setScreenSaver } from '../lib/tv'
 import { useStack } from '../nav/stack'
 import { streamQuery } from '../screens/TitleScreen'
-import { attach, type Engine, type Level } from './engine'
+import { attach, type Engine, type Level, type TextTrackInfo } from './engine'
 import { cueAt, loadCues, type Cue } from './subtitles'
 
 type SubLang = 'fa' | 'en' | 'off'
@@ -28,7 +28,7 @@ const AUTO_NEXT_S = 10
 const TAIL_S = 25
 
 const clock = (s: number) => {
-  if (!Number.isFinite(s)) return '--:--'
+  if (!Number.isFinite(s) || s < 0) return '--:--'
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
   const sec = Math.floor(s % 60)
@@ -37,10 +37,18 @@ const clock = (s: number) => {
   return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+function cleanSubtitle(raw: string): string {
+  return raw
+    .replace(/<[^>]+>/g, '') // remove HTML/VTT tags
+    .replace(/\{[^}]+\}/g, '') // remove ASS/SSA override tags like {\an8}
+    .replace(/﻿/g, '')
+    .replace(/\r/g, '')
+    .trim()
+}
+
 export function Player({ id, fileId, active }: { id: number; fileId?: number; active: boolean }) {
   const { back, replace } = useStack()
   const stream = useQuery(streamQuery(id))
-  const user = useQuery({ queryKey: ['user'], queryFn: api.user, staleTime: 60 * 60_000 })
 
   const items = useMemo(() => stream.data?.hls ?? [], [stream.data])
   // No explicit file means "resume": use the stream's saved episode, else the first file.
@@ -53,6 +61,7 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
   // Memoised: the focus effect depends on it, and playback re-renders several times a second.
   const seasonItems = useMemo(() => items.filter((i) => (i.info.season ?? 1) === season), [items, season])
 
+  const playerContainerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const engineRef = useRef<Engine | null>(null)
   const [levels, setLevels] = useState<Level[]>([])
@@ -67,6 +76,8 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
   const prefs = useSettings()
   const subLang = prefs.subLang
   const [cues, setCues] = useState<Cue[]>([])
+  const [nativeSubtitle, setNativeSubtitle] = useState<string | null>(null)
+  const [textTracks, setTextTracks] = useState<TextTrackInfo[]>([])
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const introStart = hms(item?.options.intro_start)
@@ -85,11 +96,14 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
 
   const commitSeek = useCallback(() => {
     clearTimeout(seekTimer.current)
-    const v = videoRef.current
-    if (v && seekRef.current !== null) {
-      v.currentTime = seekRef.current
-      // Show the new position now rather than after the next timeupdate.
-      setTime(seekRef.current)
+    const targetTime = seekRef.current
+    if (targetTime !== null) {
+      if (engineRef.current) {
+        engineRef.current.seek(targetTime)
+      } else if (videoRef.current) {
+        videoRef.current.currentTime = targetTime
+      }
+      setTime(targetTime)
     }
     seekRef.current = null
     setSeekTo(null)
@@ -104,8 +118,9 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
 
   const nudge = useCallback(
     (dir: 1 | -1, base = 10) => {
-      const v = videoRef.current
-      if (!v || !Number.isFinite(v.duration)) return
+      const curDur = duration
+      const curTime = seekRef.current ?? time
+      if (!Number.isFinite(curDur) || curDur <= 0) return
       const now = Date.now()
       const b = burst.current
       // Holding the key (or pressing fast) speeds up: base steps, then 3x, then 6x.
@@ -113,16 +128,16 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
       b.at = now
       b.dir = dir
       const step = base * (b.n < 4 ? 1 : b.n < 10 ? 3 : 6)
-      const target = Math.max(0, Math.min(v.duration - 1, (seekRef.current ?? v.currentTime) + dir * step))
-      seekRef.current = target
-      setSeekTo(target)
+      const targetPos = Math.max(0, Math.min(curDur - 1, curTime + dir * step))
+      seekRef.current = targetPos
+      setSeekTo(targetPos)
       clearTimeout(seekTimer.current)
       seekTimer.current = setTimeout(commitSeek, SEEK_COMMIT_MS)
       setPeek(true)
       clearTimeout(peekTimer.current)
       peekTimer.current = setTimeout(() => setPeek(false), PEEK_MS)
     },
-    [commitSeek],
+    [duration, time, commitSeek],
   )
 
   // ---- next-episode countdown, measured in playback time so pausing pauses it -------------
@@ -130,39 +145,146 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
   const [autoCancelled, setAutoCancelled] = useState(false)
   const countdown = nearEnd && !autoCancelled && autoFrom !== null ? Math.max(0, Math.ceil(AUTO_NEXT_S - (time - autoFrom))) : null
 
+  // ---- progress reporting ------------------------------------------------------------------
+  const lastReport = useRef(0)
+  const report = useCallback(
+    (currentTime?: number) => {
+      const pos = currentTime ?? engineRef.current?.currentTime() ?? videoRef.current?.currentTime ?? time
+      if (!item || !(pos > 0)) return
+      lastReport.current = pos
+      const dur = engineRef.current?.duration() ?? duration
+      api.saveContinue(
+        id,
+        item.info.file_id,
+        Math.floor(pos),
+        Math.floor(Number.isFinite(dur) && dur > 0 ? dur : 0),
+        {
+          season: item.info.season,
+          episode: item.info.episode_number,
+          episode_name: item.info.episode_name,
+        },
+      )
+      log('continue_watching_saved', true, `${Math.floor(pos)}s`)
+    },
+    [id, item, duration, time],
+  )
+
+  useEffect(() => () => report(), [report])
+
+  // ---- controls ----------------------------------------------------------------------------
+  const showControls = useCallback(() => {
+    setControls(true)
+    clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => {
+      const isCurrentlyPaused = engineRef.current?.isPaused() ?? videoRef.current?.paused ?? false
+      if (!isCurrentlyPaused) {
+        setControls(false)
+        setPanel('main')
+      }
+    }, HIDE_AFTER_MS)
+  }, [])
+
+  const togglePlay = useCallback(() => {
+    if (engineRef.current) {
+      if (paused) engineRef.current.play()
+      else engineRef.current.pause()
+    } else if (videoRef.current) {
+      if (videoRef.current.paused) videoRef.current.play().catch((e) => log('play', false, e))
+      else videoRef.current.pause()
+    }
+  }, [paused])
+
+  const playNext = useCallback(() => {
+    if (!next) return
+    report()
+    replace({ name: 'player', id, fileId: next.info.file_id })
+  }, [next, id, replace, report])
+
+  // Previous-track restarts the episode first, like most players; a second press goes back one.
+  const playPrev = useCallback(() => {
+    cancelSeek()
+    const cur = engineRef.current?.currentTime() ?? videoRef.current?.currentTime ?? time
+    if (cur > 10 || !prev) {
+      if (engineRef.current) engineRef.current.seek(0)
+      else if (videoRef.current) videoRef.current.currentTime = 0
+      setTime(0)
+      return
+    }
+    if (!prev) return
+    report()
+    replace({ name: 'player', id, fileId: prev.info.file_id })
+  }, [prev, id, replace, report, cancelSeek, time])
+
   // ---- media setup -------------------------------------------------------------------------
   useEffect(() => {
+    const container = playerContainerRef.current
     const video = videoRef.current
-    const url = item?.file.m3u8[0]?.default
-    if (!video || !url) return
+    const sources = item?.file.m3u8 ?? []
+    const url = sources[0]?.default
+    if (!container || !url) return
     setError(null)
     setBuffering(true)
+    setNativeSubtitle(null)
     log('stream', true, `file ${item.info.file_id}`)
-    // Read once per file: a settings change applies from the next title, not mid-stream.
-    const { audio, quality } = settings.get()
-    const engine = attach(video, url, { channels: audio, maxHeight: quality }, (msg) => {
-      log('playback', false, msg)
-      setError(msg)
-    })
-    engineRef.current = engine
 
+    const { audio, quality, subLang: savedSubLang } = settings.get()
     const resume = stream.data?.continue_watching
     const startAt = resume && resume.file_id === item.info.file_id && resume.time > 0 ? resume.time : 0
-    const onMeta = () => {
-      if (startAt) video.currentTime = startAt
-      setLevels(engine.levels())
-      setLevel(engine.currentLevel())
-      setDuration(video.duration)
-      video.play().catch((e) => log('autoplay', false, e))
-    }
-    video.addEventListener('loadedmetadata', onMeta, { once: true })
+
+    const engine = attach(
+      container,
+      video,
+      url,
+      { channels: audio, maxHeight: quality, subLang: savedSubLang },
+      {
+        onTimeUpdate: (t) => {
+          setTime(t)
+          if (Math.abs(t - lastReport.current) >= OBSERVER_EVERY_S) report(t)
+          if (nearEnd && autoFrom === null) setAutoFrom(t)
+          if (!nearEnd && autoFrom !== null) setAutoFrom(null)
+        },
+        onDurationChange: (d) => setDuration(d),
+        onBuffering: (b) => setBuffering(b),
+        onPlay: () => {
+          setPaused(false)
+          setScreenSaver(false)
+          showControls()
+        },
+        onPause: () => {
+          setPaused(true)
+          setScreenSaver(true)
+          setControls(true)
+          report()
+        },
+        onEnded: () => {
+          if (next && !autoCancelled) playNext()
+          else back()
+        },
+        onError: (msg) => {
+          log('playback', false, msg)
+          setError(msg)
+        },
+        onSubtitleChange: (text) => {
+          setNativeSubtitle(text ? text.trim() : null)
+        },
+        onTracksReady: (tracks) => {
+          setTextTracks(tracks)
+        },
+      },
+      sources,
+      startAt,
+    )
+    engineRef.current = engine
+    setLevels(engine.levels())
+    setLevel(engine.currentLevel())
+
     return () => {
-      video.removeEventListener('loadedmetadata', onMeta)
       engine.destroy()
       engineRef.current = null
     }
   }, [item, stream.data?.continue_watching])
 
+  // External subtitle loader (fallback if remote subtitle URLs exist)
   useEffect(() => {
     const url = subLang !== 'off' ? item?.file.subtitle?.[subLang] : undefined
     setCues([])
@@ -175,67 +297,11 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
       .catch((e) => log(`subtitle ${subLang}`, false, e))
   }, [item, subLang])
 
-  // ---- progress reporting ------------------------------------------------------------------
-  const lastReport = useRef(0)
-  const report = useCallback(() => {
-    const video = videoRef.current
-    const uid = user.data?.user_id
-    if (!video || !item || !uid || !(video.currentTime > 0)) return
-    lastReport.current = video.currentTime
-    api
-      .observer(id, item.info.file_id, uid, Math.floor(video.currentTime), Math.floor(video.duration || 0), item.options.token)
-      .then((r) => log('observer', r.success, Math.floor(video.currentTime)))
-      .catch((e) => log('observer', false, e))
-  }, [id, item, user.data?.user_id])
-
-  useEffect(() => () => report(), [report])
-
-  const onTime = () => {
-    const video = videoRef.current
-    if (!video) return
-    setTime(video.currentTime)
-    if (Math.abs(video.currentTime - lastReport.current) >= OBSERVER_EVERY_S) report()
-    if (nearEnd && autoFrom === null) setAutoFrom(video.currentTime)
-    if (!nearEnd && autoFrom !== null) setAutoFrom(null)
-  }
-
-  // ---- controls ----------------------------------------------------------------------------
-  const showControls = useCallback(() => {
-    setControls(true)
-    clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => {
-      if (!videoRef.current?.paused) {
-        setControls(false)
-        setPanel('main')
-      }
-    }, HIDE_AFTER_MS)
-  }, [])
-
-  const togglePlay = useCallback(() => {
-    const v = videoRef.current
-    if (!v) return
-    if (v.paused) v.play().catch((e) => log('play', false, e))
-    else v.pause()
-  }, [])
-
-  const playNext = useCallback(() => {
-    if (!next) return
-    report()
-    replace({ name: 'player', id, fileId: next.info.file_id })
-  }, [next, id, replace, report])
-
-  // Previous-track restarts the episode first, like most players; a second press goes back one.
-  const playPrev = useCallback(() => {
-    cancelSeek()
-    const v = videoRef.current
-    if (v && (v.currentTime > 10 || !prev)) {
-      v.currentTime = 0
-      return
-    }
-    if (!prev) return
-    report()
-    replace({ name: 'player', id, fileId: prev.info.file_id })
-  }, [prev, id, replace, report, cancelSeek])
+  // Sync subtitle language preference with player engine
+  useEffect(() => {
+    engineRef.current?.setSubtitleLang(subLang)
+    if (subLang === 'off') setNativeSubtitle(null)
+  }, [subLang])
 
   // Paused means the viewer is still deciding, even if the count reached zero.
   useEffect(() => {
@@ -245,7 +311,10 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
   // Pressing Home (or switching source) hides the app: stop playback and save the position.
   useEffect(() => {
     const onVisibility = () => {
-      if (document.hidden) videoRef.current?.pause()
+      if (document.hidden) {
+        engineRef.current?.pause()
+        videoRef.current?.pause()
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
@@ -255,7 +324,11 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
   }, [])
 
   const skipIntro = useCallback(() => {
-    if (introEnd !== null && videoRef.current) videoRef.current.currentTime = introEnd
+    if (introEnd !== null) {
+      if (engineRef.current) engineRef.current.seek(introEnd)
+      else if (videoRef.current) videoRef.current.currentTime = introEnd
+      setTime(introEnd)
+    }
   }, [introEnd])
 
   useEffect(() => {
@@ -287,7 +360,7 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
           // Back during a pending seek cancels it instead of leaving.
           cancelSeek()
         } else if (controls && panel !== 'main') setPanel('main')
-        else if (controls && !videoRef.current?.paused) setControls(false)
+        else if (controls && !paused) setControls(false)
         else back()
         return
       }
@@ -316,9 +389,17 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [active, controls, panel, inIntro, countdown, togglePlay, nudge, commitSeek, cancelSeek, showControls, skipIntro, playNext, playPrev, back])
+  }, [active, controls, panel, inIntro, countdown, paused, togglePlay, nudge, commitSeek, cancelSeek, showControls, skipIntro, playNext, playPrev, back])
 
   const cue = useMemo(() => cueAt(cues, time), [cues, time])
+  const activeSubtitle =
+    subLang !== 'off'
+      ? cue?.text
+        ? cleanSubtitle(cue.text)
+        : nativeSubtitle
+        ? cleanSubtitle(nativeSubtitle)
+        : null
+      : null
   const title = stream.data ? nameOf(stream.data.info) : ''
   const shown = seekTo ?? time
   const pct = Number.isFinite(duration) && duration > 0 ? (shown / duration) * 100 : 0
@@ -327,33 +408,15 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
 
   return (
     <Screen id={`player-${id}`} active={active}>
-      <div className="player">
+      <div ref={playerContainerRef} className="player">
         <video
           ref={videoRef}
           className="video"
-          onTimeUpdate={onTime}
-          onDurationChange={(e) => setDuration(e.currentTarget.duration)}
-          onPlay={() => {
-            setPaused(false)
-            setScreenSaver(false)
-            showControls()
-          }}
-          onPause={() => {
-            setPaused(true)
-            setScreenSaver(true)
-            setControls(true)
-            report()
-          }}
-          onWaiting={() => setBuffering(true)}
-          // A seek inside the credits restarts the countdown instead of using it up.
-          onSeeked={(e) => autoFrom !== null && setAutoFrom(e.currentTarget.currentTime)}
-          onPlaying={() => setBuffering(false)}
-          // A cancelled countdown means "stop here": the end returns to the title page.
-          onEnded={() => (next && !autoCancelled ? playNext() : back())}
+          playsInline
         />
-        {cue && (
+        {activeSubtitle && (
           <div className={`subtitle size-${prefs.subSize} ${controls ? 'raised' : ''}`} dir="auto">
-            {cue.text.split('\n').map((l, i) => (
+            {activeSubtitle.split('\n').map((l, i) => (
               <span key={i}>{l}</span>
             ))}
           </div>
@@ -419,7 +482,7 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
                   {levels.length > 0 && (
                     <Button onPress={() => setPanel('quality')}>
                       <Icon d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4v6M8 14v6" />
-                      کیفیت: {level === -1 ? 'خودکار' : `${levels[level]?.height}p`}
+                      کیفیت: {level === -1 ? 'خودکار' : levels[level]?.label || (levels[level]?.height ? `${levels[level].height}p` : 'اصلی')}
                     </Button>
                   )}
                 </div>
@@ -452,17 +515,32 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
                       className={l === subLang ? 'selected' : ''}
                       onPress={() => {
                         settings.set({ subLang: l })
+                        engineRef.current?.setSubtitleLang(l)
+                        if (l === 'off') setNativeSubtitle(null)
                         setPanel('main')
                       }}
                     >
                       {l === 'fa' ? 'فارسی' : l === 'en' ? 'انگلیسی' : 'خاموش'}
                     </Button>
                   ))}
+                  {textTracks.length > 0 &&
+                    textTracks.map((tr, i) => (
+                      <Button
+                        key={`track-${tr.index}`}
+                        focusKey={`pl-subs-track-${i}`}
+                        onPress={() => {
+                          engineRef.current?.setSubtitleTrack(tr.index)
+                          setPanel('main')
+                        }}
+                      >
+                        تِرَک: {tr.label}
+                      </Button>
+                    ))}
                 </div>
               )}
               {panel === 'quality' && (
                 <div className="osd-actions">
-                  {[{ index: -1, height: 0 }, ...[...levels].reverse()].map((l, i) => (
+                  {levels.map((l, i) => (
                     <Button
                       key={l.index}
                       focusKey={`pl-quality-${i}`}
@@ -473,7 +551,7 @@ export function Player({ id, fileId, active }: { id: number; fileId?: number; ac
                         setPanel('main')
                       }}
                     >
-                      {l.index === -1 ? 'خودکار' : `${l.height}p`}
+                      {l.label || (l.height ? `${l.height}p` : l.index === -1 ? 'خودکار' : `کیفیت ${i + 1}`)}
                     </Button>
                   ))}
                 </div>

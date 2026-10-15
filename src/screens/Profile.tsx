@@ -1,34 +1,28 @@
 import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation'
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { session } from '../api/client'
 import { api } from '../api/endpoints'
 import { Button } from '../components/Button'
 import { Screen } from '../components/Screen'
 import { Sheet } from '../components/Sheet'
 import { SideMenu } from '../components/SideMenu'
 import { log } from '../lib/log'
-import { settings, useSettings, type Settings } from '../lib/settings'
-
-const PLANS: Record<string, string> = { golden: 'طلایی', silver: 'نقره‌ای', bronze: 'برنزی', free: 'رایگان' }
+import { useSettings, settings, type Settings } from '../lib/settings'
 
 type Option<K extends keyof Settings> = { value: Settings[K]; label: string }
 
 export function Profile({ active }: { active: boolean }) {
-  const user = useQuery({ queryKey: ['user'], queryFn: api.user, staleTime: 60 * 60_000 })
   const s = useSettings()
-  const [confirm, setConfirm] = useState(false)
-  const u = user.data
+  const [confirmClear, setConfirmClear] = useState(false)
 
-  const logout = () =>
+  const clearData = () => {
     api
       .logout()
-      .catch((e) => log('logout', false, e))
-      .finally(() => {
-        session.clear()
-        // A reload drops every cached query and lands on the QR screen.
+      .then(() => {
+        log('clear_data', true, 'success')
         location.reload()
       })
+      .catch((e) => log('clear_data', false, e))
+  }
 
   return (
     <Screen id="profile" active={active} initialFocus="settings-subLang">
@@ -36,56 +30,76 @@ export function Profile({ active }: { active: boolean }) {
         <SideMenu current="profile" />
         <div className="scroll-page">
           <div className="page-head">
-            <h1>حساب و تنظیمات</h1>
+            <h1>تنظیمات برنامه</h1>
           </div>
-          {u && (
-            <div className="account">
-              {u.user_avatar && <img className="avatar" src={u.user_avatar} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />}
-              <div>
-                <div className="account-name latin">{u.user_name}</div>
-                <div className="meta">
-                  <span>اشتراک {PLANS[u.user_type] ?? u.user_type}</span>
-                  {u.user_expire && <span>{u.user_expire.days} روز باقی‌مانده</span>}
-                  {u.user_expire?.j && <span>تا {u.user_expire.j.split(' ')[0]}</span>}
-                  {!u.user_allowed_to_stream && <span className="error">پخش آنلاین برای این حساب فعال نیست</span>}
-                </div>
+
+          <div className="account">
+            <div>
+              <div className="account-name">سرویس محتوای CCloud</div>
+              <div className="meta">
+                <span>دسترسی مستقیم و رایگان</span>
+                <span>بدون نیاز به ورود یا اشتراک</span>
               </div>
             </div>
-          )}
+          </div>
 
-          <SettingRow<'subLang'> name="subLang" title="زیرنویس پیش‌فرض" value={s.subLang} options={[
-            { value: 'fa', label: 'فارسی' },
-            { value: 'en', label: 'انگلیسی' },
-            { value: 'off', label: 'خاموش' },
-          ]} />
-          <SettingRow<'subSize'> name="subSize" title="اندازه زیرنویس" value={s.subSize} options={[
-            { value: 's', label: 'کوچک' },
-            { value: 'm', label: 'متوسط' },
-            { value: 'l', label: 'بزرگ' },
-          ]} />
-          <SettingRow<'audio'> name="audio" title="صدا" value={s.audio} options={[
-            { value: '2', label: 'استریو (۲ کاناله)' },
-            { value: '6', label: 'فراگیر ۵.۱ (۶ کاناله)' },
-          ]} />
-          <SettingRow<'quality'> name="quality" title="کیفیت تصویر" value={s.quality} options={[
-            { value: 0, label: 'خودکار' },
-            { value: 1080, label: '1080p' },
-            { value: 720, label: '720p' },
-            { value: 480, label: '480p' },
-          ]} />
+          <SettingRow<'quality'>
+            name="quality"
+            title="کیفیت تصویر پیش‌فرض"
+            value={s.quality}
+            options={[
+              { value: 0, label: 'خودکار (بالاترین کیفیت)' },
+              { value: 1080, label: '1080p' },
+              { value: 720, label: '720p' },
+              { value: 480, label: '480p' },
+            ]}
+          />
+
+          <SettingRow<'subLang'>
+            name="subLang"
+            title="زیرنویس پیش‌فرض"
+            value={s.subLang}
+            options={[
+              { value: 'fa', label: 'فارسی (چسبیده / داخلی)' },
+              { value: 'en', label: 'انگلیسی' },
+              { value: 'off', label: 'خاموش' },
+            ]}
+          />
+
+          <SettingRow<'subSize'>
+            name="subSize"
+            title="اندازه متن زیرنویس"
+            value={s.subSize}
+            options={[
+              { value: 's', label: 'کوچک' },
+              { value: 'm', label: 'متوسط' },
+              { value: 'l', label: 'بزرگ' },
+            ]}
+          />
+
+          <SettingRow<'audio'>
+            name="audio"
+            title="صدای پیش‌فرض"
+            value={s.audio}
+            options={[
+              { value: '2', label: 'استریو (۲ کاناله)' },
+              { value: '6', label: 'فراگیر ۵.۱ (۶ کاناله)' },
+            ]}
+          />
 
           <div className="actions">
-            <Button onPress={() => setConfirm(true)}>خروج از حساب</Button>
+            <Button onPress={() => setConfirmClear(true)}>پاک کردن تاریخچه و داده‌های محلی</Button>
           </div>
         </div>
-        {confirm && (
+
+        {confirmClear && (
           <Sheet
-            id="logout-sheet"
-            title="از حساب سی‌نما در این تلویزیون خارج شوید؟"
-            onClose={() => setConfirm(false)}
+            id="clear-sheet"
+            title="آیا می‌خواهید تاریخچه تماشا و داده‌های ذخیره‌شده محلی پاک شوند؟"
+            onClose={() => setConfirmClear(false)}
             actions={[
               { label: 'انصراف', onPress: () => undefined },
-              { label: 'خروج', variant: 'primary', onPress: logout },
+              { label: 'پاک کردن داده‌ها', variant: 'primary', onPress: clearData },
             ]}
           />
         )}
@@ -94,20 +108,30 @@ export function Profile({ active }: { active: boolean }) {
   )
 }
 
-function SettingRow<K extends keyof Settings>({ name, title, value, options }: { name: K; title: string; value: Settings[K]; options: Option<K>[] }) {
+function SettingRow<K extends keyof Settings>({
+  name,
+  title,
+  value,
+  options,
+}: {
+  name: K
+  title: string
+  value: Settings[K]
+  options: Option<K>[]
+}) {
   const { ref, focusKey } = useFocusable({ focusKey: `settings-${name}`, saveLastFocusedChild: true })
   return (
     <FocusContext.Provider value={focusKey}>
-      <section ref={ref} className="setting">
-        <h2 className="section-title">{title}</h2>
-        <div className="chips">
-          {options.map((o) => (
+      <section ref={ref} className="setting-row">
+        <h2>{title}</h2>
+        <div className="chips wrap">
+          {options.map((opt) => (
             <Button
-              key={String(o.value)}
-              className={`${o.value === value ? 'selected' : ''} ${/^[\x20-\x7e]+$/.test(o.label) ? 'latin' : ''}`}
-              onPress={() => settings.set({ [name]: o.value } as Partial<Settings>)}
+              key={String(opt.value)}
+              className={opt.value === value ? 'selected' : ''}
+              onPress={() => settings.set({ [name]: opt.value } as Partial<Settings>)}
             >
-              {o.label}
+              {opt.label}
             </Button>
           ))}
         </div>

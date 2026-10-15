@@ -1,0 +1,8 @@
+{
+  "apiBase": "https://server-hi-speed-iran.info/api",
+  "apiKey": "YOUR_CCLOUD_API_KEY",
+  "helperServers": [
+    "https://hostinnegar.com",
+    "https://windowsdiba.info"
+  ]
+}

@@ -6,18 +6,18 @@ import { Grid } from '../components/Grid'
 import { Screen } from '../components/Screen'
 import { useStack, type ListSource } from '../nav/stack'
 
-// Only these two orders change the result on v2; "imdb" and "date" fall back to relevance.
-type Order = 'relevant' | 'year'
+// CCloud supports three native filter orders: created (default), imdb, and year
+type Order = 'created' | 'imdb' | 'year'
 
 function fetcher(source: ListSource, order: Order): (page: number) => Promise<Page> {
   if (source.kind === 'archive') return (page) => api.archive(source.slug, page, order)
   if (source.kind === 'filter') return (page) => api.advancedSearch(source.params, page, order)
-  return (page) => api.advancedSearch({ [source.role]: source.imdb || source.name, stream: 'true' }, page, order)
+  return (page) => api.advancedSearch({ [source.role]: source.name }, page, order)
 }
 
 export function ListScreen({ title, source, active, routeKey }: { title: string; source: ListSource; active: boolean; routeKey: string }) {
   const { push } = useStack()
-  const [order, setOrder] = useState<Order>('relevant')
+  const [order, setOrder] = useState<Order>('created')
   const open = (t: Title) => push({ name: 'title', id: t.id })
   const subtitle = source.kind === 'person' ? (source.role === 'actor' ? 'آثار بازیگر' : 'آثار کارگردان') : null
 
@@ -31,11 +31,14 @@ export function ListScreen({ title, source, active, routeKey }: { title: string;
               <h1 className={/[؀-ۿ]/.test(title) ? '' : 'latin'}>{title}</h1>
             </div>
             <div className="chips">
-              <Button className={order === 'relevant' ? 'selected' : ''} onPress={() => setOrder('relevant')}>
-                مرتبط‌ترین
+              <Button className={order === 'created' ? 'selected' : ''} onPress={() => setOrder('created')}>
+                جدیدترین
+              </Button>
+              <Button className={order === 'imdb' ? 'selected' : ''} onPress={() => setOrder('imdb')}>
+                برترین IMDb
               </Button>
               <Button className={order === 'year' ? 'selected' : ''} onPress={() => setOrder('year')}>
-                جدیدترین
+                سال ساخت
               </Button>
             </div>
           </div>

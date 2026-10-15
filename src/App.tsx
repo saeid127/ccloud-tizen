@@ -1,9 +1,8 @@
 import { init } from '@noriginmedia/norigin-spatial-navigation'
-import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
-import { ApiError, session } from './api/client'
-import { api } from './api/endpoints'
-import { log, logStore } from './lib/log'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { ApiError } from './api/client'
+import { logStore } from './lib/log'
 import { blockNativeArrowScroll, is, registerTvKeys } from './lib/tv'
 import { StackProvider, type Route } from './nav/stack'
 import { Player } from './player/Player'
@@ -11,7 +10,6 @@ import { Browse } from './screens/Browse'
 import { Filters } from './screens/Filters'
 import { Home } from './screens/Home'
 import { ListScreen } from './screens/ListScreen'
-import { Login } from './screens/Login'
 import { MyList } from './screens/MyList'
 import { Notifications } from './screens/Notifications'
 import { Profile } from './screens/Profile'
@@ -75,32 +73,6 @@ export default function App() {
 }
 
 function Gate() {
-  const qc = useQueryClient()
-  const [hasToken, setHasToken] = useState(() => !!session.get())
-  const user = useQuery({ queryKey: ['user'], queryFn: api.user, enabled: hasToken, staleTime: 60 * 60_000, retry: 0 })
-
-  useEffect(() => {
-    if (user.isSuccess) log('user', true, `${user.data.user_name} · ${user.data.user_type} · ${user.data.user_expire?.days ?? '?'}d`)
-    if (user.isError) {
-      log('user', false, user.error)
-      // An expired or revoked session sends the viewer back to the QR screen.
-      if (user.error instanceof ApiError && user.error.kind === 'unauthorized') {
-        session.clear()
-        setHasToken(false)
-      }
-    }
-  }, [user.isSuccess, user.isError, user.data, user.error])
-
-  const onLoggedIn = useCallback(() => {
-    qc.clear()
-    setHasToken(true)
-  }, [qc])
-
-  if (!hasToken) return <Login onLoggedIn={onLoggedIn} />
-  if (user.isError && !(user.error instanceof ApiError && user.error.kind === 'unauthorized'))
-    return <p className="error center">{(user.error as Error).message}</p>
-  if (!user.data) return <div className="spinner center" />
-
   return (
     <StackProvider root={ROOT} render={renderRoute} />
   )

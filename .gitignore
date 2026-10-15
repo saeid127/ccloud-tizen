@@ -28,3 +28,4 @@ dist
 .buildResult
 .tizen
 release
+config.json
